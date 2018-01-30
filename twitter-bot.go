@@ -4,15 +4,13 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/dghubble/go-twitter/twitter"
 	"github.com/dghubble/oauth1"
 	"github.com/joho/godotenv"
 )
 
-func configure() {
+func configure() *twitter.Client {
 	apiKey := os.Getenv("TWITTER_CONSUMER_API_KEY")
 	apiSecret := os.Getenv("TWITTER_CONSUMER_API_SECRET")
 	accountToken := os.Getenv("TWITTER_ACCOUNT_ACCESS_TOKEN")
@@ -21,39 +19,20 @@ func configure() {
 	token := oauth1.NewToken(accountToken, accountSecret)
 	httpClient := config.Client(oauth1.NoContext, token)
 	client := twitter.NewClient(httpClient)
+	return client
+}
 
-	demux := twitter.NewSwitchDemux()
+func tweet(tweetText string, client *twitter.Client) bool {
+	tweet, resp, err := client.Statuses.Update(tweetText, nil)
 
-	demux.Tweet = func(tweet *twitter.Tweet) {
-		fmt.Println(tweet.Text)
-	}
-
-	demux.DM = func(dm *twitter.DirectMessage) {
-		fmt.Println(dm.SenderID)
-	}
-
-	fmt.Println("starting stream....")
-
-	//FILTER
-	filterParams := &twitter.StreamFilterParams{
-		Track:         []string{"crypto"},
-		StallWarnings: twitter.Bool(true),
-	}
-
-	stream, err := client.Streams.Filter(filterParams)
+	fmt.Println(tweet)
+	fmt.Println(resp.StatusCode)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Error tweeting")
+		return false
 	}
 
-	go demux.HandleChan(stream.Messages)
-
-	ch := make(chan os.Signal)
-	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
-
-	log.Println(<-ch)
-
-	fmt.Println("Stopping stream...")
-	stream.Stop()
+	return true
 }
 
 func main() {
@@ -62,6 +41,9 @@ func main() {
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}
+
 	fmt.Println("Go-Twitter Bot v0.01")
-	configure()
+	client := configure()
+	tweet("did I get blocked?", client)
+
 }
